@@ -22,33 +22,33 @@ _G[M.name] = M
 function M.start(port)
    print('telnetd: starting server at port ' .. port)
    print('telnetd: please use console via telent from now.')
-  s = net.createServer(net.TCP, 180)
-  s:listen(port,
-           function(c)
+   s = net.createServer(net.TCP, 180)
+   s:listen(port,
+            function(c)
 
-              function s_output(str)
-                 if(c ~= nil) then
-                    c:send(str)
-                 end
-              end
+               function s_output(str)
+                  if(c ~= nil) then
+                     c:send(str)
+                  end
+               end
 
-              -- redirect output to function s_ouput.
-              node.output(s_output, 0)
+               -- redirect output to function s_ouput.
+               node.output(s_output, 0)
 
-              -- works like pcall(loadstring(l)) but support multiple separate line
-              c:on("receive",
-                   function(c, l)
-                      node.input(l)
-                   end
-              )
-              -- un-regist the redirect output function, output goes to serial
-              c:on("disconnection",
-                   function(c)
-                      node.output(nil)
-                   end
-              )
-              print('Welcome to NodeMCU console.\r\n')
-  end)
+               -- works like pcall(loadstring(l)) but support multiple separate line
+               c:on("receive",
+                    function(c, l)
+                       node.input(l)
+                    end
+               )
+               -- un-regist the redirect output function, output goes to serial
+               c:on("disconnection",
+                    function(c)
+                       node.output(nil)
+                    end
+               )
+               print('Welcome to NodeMCU console.\r\n')
+   end)
 end
 
 return M
