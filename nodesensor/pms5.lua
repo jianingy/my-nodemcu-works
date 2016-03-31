@@ -64,10 +64,10 @@ end
 
 
 local function clear_uart_buffer()
-   -- reset device
-   gpio.write(M.pin_set, gpio.LOW)
    -- clear buffer
    uart.on('data', 0, function(data) end, 0)
+   -- reset device
+   gpio.write(M.pin_set, gpio.LOW)
    uart.on('data')
 end
 
@@ -80,12 +80,15 @@ local function on_uart(data)
          M.callback(d)
       end
    end
+   clear_uart_buffer()
+   uart.alt(0)
    tmr.start(4)
 end
 
 local function read_uart()
    print('pms5003: start reading uart\r\n')
    tmr.stop(4)
+   uart.alt(1)
    clear_uart_buffer()
    uart.on('data', 32, on_uart, 0)
    gpio.write(M.pin_set, gpio.HIGH)
