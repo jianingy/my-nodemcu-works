@@ -47,7 +47,7 @@ local function wait_for_wifi()
       led.flash(0)
       M.ip, M.netmask, M.gateway = wifi.sta.getip()
       tmr.stop(1)
-      print('wirless: ip is ' .. M.ip)
+      print('wireless: ip is ' .. M.ip)
       on_connected()
    elseif  M.state == 'STATION_CONNECT_FAIL' then
       led.flash(500)
