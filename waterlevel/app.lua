@@ -16,6 +16,9 @@ require 'wireless'
 require 'ntp'
 -- require 'telnetd'
 
+local pump_auto = 1
+local pump_status = 0
+
 function trim(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
 end
@@ -44,13 +47,13 @@ end
 function on_ready ()
    print("app: system is ready")
    print("app: configuring adc mode")
-   local pin_pump = require('settings').pin.pump
+   local pin_pump = settings.pin.pump
    gpio.mode(pin_pump, gpio.OUTPUT)
-   gpio.write(pin_pump, gpio.HIGH)
+   set_pump_power(0)
    print("ctrld: pump deactivated")
    -- telnetd.start(settings.telnetd.port)
    start_controller_server()
-   tmr.alarm(4, settings.interval, 1, read_waterlevel)
+   tmr.alarm(4, settings.interval.waterlevel, 1, read_waterlevel)
 end
 
 function start_controller_server()
@@ -66,32 +69,61 @@ end
 function on_controller_server_command (s, payload)
    cmd = trim(payload)
    print("ctrld: got payload '" .. cmd .. "'")
-   s:send("GOT\n")
+   local pin_pump = settings.pin.pump
+   if cmd == "pump on" then
+      pump_auto = 0
+      set_pump_power(1)
+      print("pump: switched on manually")
+      s:send("pump: switched on manually\r\n")
+      tmr.alarm(6, settings.interval.pump_auto, 1, set_pump_auto)
+   elseif cmd == "pump off" then
+      pump_auto = 0
+      set_pump_power(0)
+      print("pump: switched off manually")
+      s:send("pump: switched off manually\r\n")
+      tmr.alarm(6, settings.interval.pump_auto, 1, set_pump_auto)
+   elseif cmd == "pump auto" then
+      pump_auto = 1
+      print("pump: set pump power mode to auto")
+      s:send("pump: set pump power mode to auto\r\n")
+   elseif cmd == "pump status" then
+      s:send("pump: status = " .. pump_status .. "\r\n")
+   end
    s:close()
    s = nil
-
-   local pin_pump = require('settings').pin.pump
-   if cmd == "pump on" then
-      gpio.write(pin_pump, gpio.LOW)
-   elseif cmd == "pump off" then
-      gpio.write(pin_pump, gpio.HIGH)
-   end
-
 end
 
 function read_waterlevel ()
    tmr.stop(4)
    val = adc.read(0)
    print('waterlevel: ' .. val)
-   local pin_pump = require('settings').pin.pump
-   if val > 360 then
-      gpio.write(pin_pump, gpio.LOW)
-   elseif val < 200 then
-      gpio.write(pin_pump, gpio.HIGH)
+   if pump_auto > 0 then
+      if val > 360 then
+         print("pump: switch on automatically")
+         set_pump_power(1)
+      elseif val < 200 then
+         set_pump_power(0)
+         print("pump: switch off automatically")
+      end
    end
    sec, usec = rtctime.get()
    send_data('daling.environment.ac.waterlevel ' .. val .. ' ' .. sec .. '\r\n')
-   tmr.alarm(4, settings.interval, 1, read_waterlevel)
+   tmr.alarm(4, settings.interval.waterlevel, 1, read_waterlevel)
+end
+
+function set_pump_power(status)
+   local pin_pump = settings.pin.pump
+   if status == 1 then
+      gpio.write(pin_pump, gpio.LOW)
+   else
+      gpio.write(pin_pump, gpio.HIGH)
+   end
+   pump_status = status
+end
+
+function set_pump_auto()
+   tmr.stop(6)
+   pump_auto = 1
 end
 
 
