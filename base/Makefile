@@ -1,5 +1,5 @@
 PORT := /dev/ttyUSB0
-BAUDRATE := 115200
+BAUDRATE := 9600
 all: init lib
 
 init: init.lua

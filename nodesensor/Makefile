@@ -1,4 +1,5 @@
 PORT := /dev/ttyUSB0
+BAUDRATE := 9600
 
 all: app settings
 
