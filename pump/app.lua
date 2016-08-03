@@ -46,11 +46,19 @@ end
 
 function on_ready ()
    print("app: system is ready")
-   print("app: configuring adc mode")
+
    local pin_pump = settings.pin.pump
+   local pin_scale = settings.pin.scale
+   print("app: configurating pins: pump=" .. pin_pump .. ", scale=" .. pin_scale)
    gpio.mode(pin_pump, gpio.OUTPUT)
+   gpio.mode(pin_scale, gpio.INPUT)
+
+   print("app: configuring adc mode")
+   adc.force_init_mode(adc.INIT_ADC)
+
+   print("ctrld: pump deactivating")
    set_pump_power(0)
-   print("ctrld: pump deactivated")
+
    -- telnetd.start(settings.telnetd.port)
    start_controller_server()
    tmr.alarm(4, settings.interval.waterlevel, 1, read_waterlevel)
@@ -71,19 +79,16 @@ function on_controller_server_command (s, payload)
    print("ctrld: got payload '" .. cmd .. "'")
    local pin_pump = settings.pin.pump
    if cmd == "pump on" then
-      pump_auto = 0
       set_pump_power(1)
       print("pump: switched on manually")
       s:send("pump: switched on manually\r\n")
       tmr.alarm(6, settings.interval.pump_auto, 1, set_pump_auto)
    elseif cmd == "pump off" then
-      pump_auto = 0
       set_pump_power(0)
       print("pump: switched off manually")
       s:send("pump: switched off manually\r\n")
       tmr.alarm(6, settings.interval.pump_auto, 1, set_pump_auto)
    elseif cmd == "pump auto" then
-      pump_auto = 1
       print("pump: set pump power mode to auto")
       s:send("pump: set pump power mode to auto\r\n")
    elseif cmd == "pump status" then
@@ -96,15 +101,14 @@ end
 function read_waterlevel ()
    tmr.stop(4)
    val = adc.read(0)
+   weight = gpio.read(settings.pin.scale)
    print('waterlevel: ' .. val)
-   if pump_auto > 0 then
-      if val > 360 then
-         print("pump: switch on automatically")
-         set_pump_power(1)
-      elseif val < 200 then
-         set_pump_power(0)
-         print("pump: switch off automatically")
-      end
+   if val > 360 then
+      print("pump: switch on automatically. material seems above waterlevel.")
+      set_pump_power(1)
+   elseif weight == 1 then
+      set_pump_power(0)
+      print("pump: switch off automatically. bucket seems empty.")
    end
    sec, usec = rtctime.get()
    send_data('daling.environment.ac.waterlevel ' .. val .. ' ' .. sec .. '\r\n')
