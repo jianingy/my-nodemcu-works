@@ -19,7 +19,7 @@ do
    local pin, console = {led = settings.pin.led, tact = 3}, false
 
    -- disable serial/uart (console)
-   print('starting nodemcu base system. version: 0.1.2')
+   print('starting nodemcu base system. version: 0.1.3')
    print('Press ENTER or KEY_FLASH to enable the console.')
    uart.on('data', '\r',
            function(data)
