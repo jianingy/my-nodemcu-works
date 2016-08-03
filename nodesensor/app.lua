@@ -34,16 +34,12 @@ function send_data(text)
 
    socket = net.createConnection(net.TCP, 0)
    socket:on('connection', on_connected)
-   socket:connect(settings.hub.port, settings.hub.host)
+   socket:connect(settings.carbon.port, settings.carbon.host)
 end
 
 function on_data(d)
    if (d) then
-      json = cjson.encode(d)
-      if json then
-         print('main: receive data ' .. json)
-         send_data(json .. '\n')
-      end
+      print('main: receive data ' .. d)
    end
 end
 
