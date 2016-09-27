@@ -16,8 +16,11 @@ require 'wireless'
 require 'ntp'
 -- require 'telnetd'
 
-local pump_auto = 1
+local pump_manually_on = 0
 local pump_status = 0
+local waterlevel = -1
+local initial_weight = -1
+local current_weight = -1
 
 function trim(s)
   return (s:gsub("^%s*(.-)%s*$", "%1"))
@@ -49,7 +52,7 @@ function on_ready ()
 
    local pin_pump = settings.pin.pump
    local pin_scale = settings.pin.scale
-   print("app: configurating pins: pump=" .. pin_pump .. ", scale=" .. pin_scale)
+   print("app: configurating pins: pump=" .. pin_pump .. ", scale=" .. pin_scale .. ", start_level = " .. settings.start_level)
    gpio.mode(pin_pump, gpio.OUTPUT)
    gpio.mode(pin_scale, gpio.INPUT)
 
@@ -82,17 +85,19 @@ function on_controller_server_command (s, payload)
       set_pump_power(1)
       print("pump: switched on manually")
       s:send("pump: switched on manually\r\n")
-      tmr.alarm(6, settings.interval.pump_auto, 1, set_pump_auto)
+      pump_manually_on = 1
    elseif cmd == "pump off" then
       set_pump_power(0)
       print("pump: switched off manually")
       s:send("pump: switched off manually\r\n")
-      tmr.alarm(6, settings.interval.pump_auto, 1, set_pump_auto)
+      pump_manually_on = 0
    elseif cmd == "pump auto" then
       print("pump: set pump power mode to auto")
       s:send("pump: set pump power mode to auto\r\n")
    elseif cmd == "pump status" then
       s:send("pump: status = " .. pump_status .. "\r\n")
+   elseif cmd == "pump sensors" then
+      s:send("pump: level = " .. waterlevel .. ", weight = " .. current_weight .. "/" .. initial_weight .. ". \r\n")
    end
    s:close()
    s = nil
@@ -100,18 +105,30 @@ end
 
 function read_waterlevel ()
    tmr.stop(4)
+   print('pump: reading scale')
    val = adc.read(0)
-   weight = gpio.read(settings.pin.scale)
-   print('waterlevel: ' .. val)
-   if val > 360 then
+   current_weight = gpio.read(settings.pin.scale)
+   waterlevel = val
+   if initial_weight < 0 then
+       initial_weight = current_weight
+   end
+   print('pump: set scale led')
+   if current_weight == 1 then
+      gpio.write(settings.pin.led, gpio.LOW)
+   elseif current_weight == 0 and pump_manually_on == 0 then
+      gpio.write(settings.pin.led, gpio.HIGH)
+   end
+   print('pump: waterlevel = ' .. val .. ', scale level = ' .. current_weight)
+   if val > settings.start_level then
       print("pump: switch on automatically. material seems above waterlevel.")
       set_pump_power(1)
-   elseif weight == 1 then
+   elseif current_weight == 1 and pump_manually_on == 0 then
       set_pump_power(0)
       print("pump: switch off automatically. bucket seems empty.")
    end
    sec, usec = rtctime.get()
    send_data('daling.environment.ac.waterlevel ' .. val .. ' ' .. sec .. '\r\n')
+   send_data('daling.environment.ac.pump_status ' .. pump_status .. ' ' .. sec .. '\r\n')
    tmr.alarm(4, settings.interval.waterlevel, 1, read_waterlevel)
 end
 
@@ -124,11 +141,5 @@ function set_pump_power(status)
    end
    pump_status = status
 end
-
-function set_pump_auto()
-   tmr.stop(6)
-   pump_auto = 1
-end
-
 
 wireless.connect(settings.wifi.ssid, settings.wifi.secret, on_wifi_connected)
